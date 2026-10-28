@@ -323,14 +323,6 @@ function summarize(u8){
   };
 }
 
-// Example save, shown until a file is loaded
-const SAMPLE = {
-  player: {currentMoney:1834561,SavedDateTime:639287520341790000,PlayTime:233338,EscapeNum:248,WinNum:641,StealSuccessNum:3,
-    GameDifficulty:"eGameDifficulty::Easy",spentMoney:1683950,earnedMoney:3518511,breakCount:959,finishblowCount:214},
-  story: 8040, joined: [8, 8], airship: true,
-  colo: {fledgling: [5, 5], brawler: [5, 5], gladiator: [5, 5]}, visions: 26, maxAwake: 3,
-};
-
 // Every achievement. `read` returns [current, goal] or a boolean; leave it out when the save can't tell.
 // Steam achievement icons by name: [color, grey], served from icons/<hash>.jpg
 const ICONS = {"Ultimate Fantasy":["af5ecd7224d09b5e7972f18801062ced91325507","d684b97ec025b7cfa8622d9e91eec16b1c494cf3"],"A Journey Begins":["8dfdc353f058a10e279f1addc58ed121fcf1b5c1","ff8c5cb432fc6f21da425c3a5162ecd7539baf97"],"Those Who Unite the Skies":["062b1e6a11577f5ecfcd5479fbcd209ac1fab2dd","aec7741d9420001b3486f6321ffdad7cbba787ab"],"Olderion Blues":["a84a1196f1a8520cca484cbe610f7e68250122c7","2b3c8426029cc132bd298be93dd5f15212663bc8"],"Viva la Revolución":["89d47f5fb6ac5fb25d603e201ef0c2c0fce513b3","a324469914725941c5aac12e19aa642c005b2bbb"],"In Search of the Truth":["1e906146b64099a0f1d3a64b0542ea4798603838","deebb7751a82d5c46162a6cc7cc53d16257c1efb"],"And the Winner Is...":["d3dcde04e9e3734698b1b60ecfea4ab20b983692","cd127a7b9ce8c92789514b57c59823f7133de0a3"],"Past Glory":["cd5b9230c038e65fbb1edfb2145b9038b9ba44fc","bd6bc28e2010448d775843408913c4386dd3fee0"],"Aspiration’s End":["67f1a3237a62bc30057b2bda5a1e74e4e397a442","1bbcf54487c3f44feb987cd8483d5061f75785af"],"Those Who Defy Fate":["32345b85cac1f414eb492787215ef433bd45d461","dd4ad7afd4ac14ced76cfbb081de96568fa4c583"],"Conscience Renewed":["bb9adf5df34be30c142406bf40835efc90cc0596","9a668253e9d42d7e2a54ef0eaa2578f791398771"],"Kweh!":["ccd1ff2b78f364f44b1b8b7e9bc691f5c7634d41","c0e60a4cf905fb3296d222204182b61493dbe975"],"Airship Enterprise":["209d1d752266388a52fd717c5319c632987a4236","58393e4f4eacf961f3717002a3e01ac195d65069"],"Just Getting Started":["b0f6f759d728dce25a288fe69902895e637563c1","361972aa145f9de510c399fddb33890df57d4c7f"],"Arena Fighter":["0a8d7ca4d3a9e1b0da88e8408545692aefbf2476","62c453966caa14c7ffa563d1dc2064e51bdc13b4"],"Career Fighter":["3f277c0b72bbf2dd0ea3dddc59dc1bc0efb2b6fd","04a54a078a4d907f514e53e7365618d083b63fba"],"Princess’s Reward":["b49845c8716a94afe8cbcdef1d20edeccdff8e93","00760fdc247d5956bfb389ae605789ec3964ff37"],"Memento":["bd822c93b6f7d8b2c4cd22622c62a51666f5b36b","114e847244ae6e8c480a2449ce0a69d0b4186208"],"Gil Comes and Goes":["921d942d4febf4ed98f25bcfcf3335a7f0dea3d4","24f60e18166e65211992dfc571abf79805b1a012"],"Making Lid Proud":["bca7a9753c1cc63116209c674f1309be9881673a","f2f2e175e613711ac9101576ee7d5c64db8e7589"],"Magicite Hunter":["9190d041ba3345292f650eb3161b943671815c25","3bbb0d356b11424e00cf0c30eeae2ff13ac30eb2"],"The Bigger They Are...":["6d79958fcb42b236c9c9edf816269fe67661467b","77e7f6e1ac16cd4aafc6bbed0352d4447c049390"],"The Harder They Fall":["bae05e2158b7c60baca86b796db7d351f42b79fb","6cda559c2d9c49a1bad77d2cac5d684d191d8c1d"],"Struck Gold":["02dfb1f732f4590ba4364c2e0f5ee8332565b727","b4c049abf68fffc74e9f1ea115635ae36f740c44"],"The Weapon that Suits the User":["ca3e7ec5fe6676a64e9b1ccc05d0766b3d951fb0","c5db6c3502643bfe3f74a28c7bef733433fed972"],"The Weaponsmith":["68a3f4d907638c1989e87232352756bd6a147997","2fb5a31d649c3a6355a434378142ce4faabe3cc5"],"Ancient Artifact":["2ae629f9bd6dabd442c6fb0b0439a7cd8bcdef49","16a0fbb755b323091e553efe336b4f26bcbcf8d0"],"Legendary Arms":["2a29439baa8035a35d91ded9c40d1e6f64721a71","94271aa923c78a9bea88318d84163865d94e86c4"],"Priceless Experience":["ad8e0ca49857c53cef432c6e4913ac2c627707e3","9f8aa58026956f788cbc76c61cde620c25044b04"],"The First Step Towards Mastery":["25138cf611e139661902202cb969bfc2b7b6d771","f6924db39d893d50972efe9f9fa9b88653cfa750"],"Awakened Light":["0e1d729448b4ab66aaa8fdcc69d74c7e73e54a7e","3f85dca6ea9a2bef940ebe5da811d873f4ff2948"],"Visions Assemble":["dad08626b715772896cbe2fe37c814b366a2ef3a","91cdd324396941ce2042b15739f219f0c568ce8d"],"Will Crystallized":["da98979cdf4e8aaefb39c8663261675cd9233592","75976ea7cf603b51ff10fc03aad1f6bd0bbe74c7"],"Vision Connoisseur":["e8b8eaebf004927838d2469214f309eb471699eb","e5683997d26c6297dca41044f7709c2ef4201510"],"Esper’s Covenant":["74fa8f26b9fe5c053c72db22a93d47f61e323c3e","da7de9150322110662b1025b9f661b65f981acae"],"The Sovereigns of the Planet":["2ba72a4d99ec33ec74c285be2b379e90b86e2e8a","51dc4fec9eeff6b42ec4c99a14fb3b84aa6066f0"],"Keep Them on Their Toes":["31fa2d3f5e57ffea213830a121b5d69d56c13bb9","5b414a574a566159f8d189e853ae77ed10741951"],"Resonance Rapid Fire":["fcff68165d0fecba17eef94e3523981d0cedf110","9e0ef99791ae1b7b1a2329bc00d7017eb2ea065b"],"Mechabo Mania":["090f84b945292400556bcd8a59567032ef8449fc","961d99ecfe30f1df988baf3fe984ea7cdc7b89b7"],"My Name Is Ultima...":["d329d545941f009a4878b9e2fe28fd7e66e1a12b","886eb1a4d3752cfcb8c960df3c7d5a7be1a59ce8"]};
@@ -407,7 +399,17 @@ const store = {
 };
 
 function tracker(id, value, goal, prev){
-  const el = $(id), done = value >= goal;
+  const el = $(id);
+  if (value == null) {
+    el.classList.remove("done");
+    el.querySelector(".state").textContent = "";
+    el.querySelector(".n").textContent = "—";
+    el.querySelector(".gauge b").style.width = "0%";
+    el.querySelector(".togo").textContent = "Drop a save to see your count.";
+    el.querySelector(".delta").textContent = "";
+    return;
+  }
+  const done = value >= goal;
   el.classList.toggle("done", done);
   el.querySelector(".state").textContent = done ? "Complete" : `${Math.floor(Math.min(value / goal, 1) * 100)}%`;
   el.querySelector(".n").textContent = value;
@@ -419,9 +421,10 @@ function tracker(id, value, goal, prev){
 
 function row(name, desc, read, m){
   let v = null;
-  try { v = read ? read(m) : null; } catch { v = null; }
+  try { v = read && m ? read(m) : null; } catch { v = null; }
   let cls = "unknown", state = "Not in save", val = "The save doesn't record this";
-  if (Array.isArray(v)) {
+  if (!m && read) { cls = ""; state = "—"; val = "Drop a save to check"; }
+  else if (Array.isArray(v)) {
     const [cur, goal] = v, done = cur >= goal;
     cls = done ? "done" : "";
     state = done ? "Complete" : `${Math.floor(cur / goal * 100)}%`;
@@ -434,29 +437,32 @@ function row(name, desc, read, m){
   return {cls, html: `<div class="row ${cls}">${img}<div class="r-main"><span class="r-name">${esc(name)}</span><span class="r-state">${state}</span><span class="r-desc">${esc(desc)}</span><span class="r-val">${val}</span></div></div>`};
 }
 
+// With no save loaded (m is null) everything renders blank
 function render(m, label, prev){
-  const p = m.player;
-  tracker("ach-stagger", p.breakCount, 1000, prev && prev.breakCount);
-  tracker("ach-reso", p.finishblowCount, 400, prev && prev.finishblowCount);
+  const p = m ? m.player : null;
+  tracker("ach-stagger", p && p.breakCount, 1000, prev && prev.breakCount);
+  tracker("ach-reso", p && p.finishblowCount, 400, prev && prev.finishblowCount);
   const rows = [
-    ["Won", fmt(p.WinNum ?? 0)],
-    ["Escaped", fmt(p.EscapeNum ?? 0)],
-    ["Stolen", fmt(p.StealSuccessNum ?? 0)],
-    ["Difficulty", String(p.GameDifficulty || "").split("::").pop() || "?"],
+    ["Won", p ? fmt(p.WinNum ?? 0) : "—"],
+    ["Escaped", p ? fmt(p.EscapeNum ?? 0) : "—"],
+    ["Stolen", p ? fmt(p.StealSuccessNum ?? 0) : "—"],
+    ["Difficulty", p ? String(p.GameDifficulty || "").split("::").pop() || "?" : "—"],
   ];
   $("record").innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("");
-  $("timegil").innerHTML = `<span>Time</span><span>${clock(p.PlayTime ?? 0)}</span><span>Gil</span><span>${p.currentMoney ?? 0}</span>`;
+  $("timegil").innerHTML = `<span>Time</span><span>${p ? clock(p.PlayTime ?? 0) : "—"}</span><span>Gil</span><span>${p ? p.currentMoney ?? 0 : "—"}</span>`;
 
   let tracked = 0, complete = 0, total = 0;
   $("groups").innerHTML = ACH.map(([group, list]) => {
     const html = list.map(([name, desc, read]) => {
       const r = row(name, desc, read, m);
-      total++; if (r.cls !== "unknown") tracked++; if (r.cls === "done") complete++;
+      total++; if (read) tracked++; if (r.cls === "done") complete++;
       return r.html;
     }).join("");
     return `<section class="group"><h3>${group}</h3><div class="rows">${html}</div></section>`;
   }).join("");
-  $("summary").innerHTML = `<b>${complete}</b> of the <b>${tracked}</b> achievements this page can read are complete in this save. ${total - tracked} more aren't recorded in the save.`;
+  $("summary").innerHTML = m
+    ? `<b>${complete}</b> of the <b>${tracked}</b> achievements this page can read are complete in this save. ${total - tracked} more aren't recorded in the save.`
+    : `Drop a save to see which achievements are complete. This page can read <b>${tracked}</b> of the <b>${total}</b> from a save.`;
   $("status").innerHTML = label;
 }
 
@@ -520,7 +526,7 @@ setHide(store.get("ffr-tally-hide") === true);
   size(); addEventListener("resize", size); requestAnimationFrame(draw);
 })();
 
-render(SAMPLE, `<span class="tag">Example</span><span>Example numbers. Drop your save to see your own.</span>`, null);
+render(null, `<span class="tag">No save loaded</span><span>Drop a save above to see your progress.</span>`, null);
 </script>
 </body>
 </html>
