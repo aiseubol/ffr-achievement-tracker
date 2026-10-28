@@ -18,7 +18,7 @@ The save is decrypted and read entirely in your browser. Nothing is uploaded.
 | Achievement | Read from the save |
 |---|---|
 | Keep Them on Their Toes (stagger 1000 times) | `Player.breakCount` |
-| Resonance Rapid Fire (use Resonances 400 times) | `Player.finishblowCount` (most likely the Resonance counter) |
+| Resonance Rapid Fire (use Resonances 400 times) | `Player.finishblowCount` |
 | Chapters 1–8 | Story progress value |
 | Those Who Defy Fate | Party members joined |
 | Airship Enterprise | Airship flag |
