@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Drop a Final Fantasy Resonance save to see your achievement progress. Runs entirely in your browser.">
+<title>Stagger &amp; Resonance Tally</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: an FF7-style menu screen over a drifting Lifestream. Help bar on top doubles as the drop zone; the two
+   counter achievements on the left, Record and Time/Gil on the right, then every achievement in one window below.
+   Single dark look by design. */
+:root{
+  --void:#000004; --mako:#0b3b2c;
+  --win-hi:#2a4bd0; --win-lo:#030b45; --frame:#d4d6e4; --frame-dark:#5a5f7a;
+  --text:#f2f2f7; --shadow:#0b0b1a; --label:#6fd3ff; --yellow:#ffe85c; --grey:#9ea4c2; --dim:#6c7296;
+  --hp-a:#3fb7ff; --hp-b:#1c56e0; --lim-a:#ff5d8a; --lim-b:#d5154a; --gauge-bg:#0a0a24;
+  --face:"Barlow Semi Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+  color-scheme:dark;
+}
+html{background:var(--void)}
+body{margin:0}
+body{background:radial-gradient(120% 60% at 50% -10%, var(--mako), transparent 60%), var(--void);
+  color:var(--text);font-family:var(--face);font-weight:600;font-size:18px;line-height:1.35;min-height:100%;
+  text-shadow:2px 2px 0 var(--shadow)}
+#stream{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.screen{position:relative;z-index:1;max-width:960px;margin:0 auto;padding-block:28px 48px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
+  display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:10px;align-items:start}
+@media (max-width:720px){ .screen{grid-template-columns:minmax(0,1fr)} }
+
+/* The menu window: blue gradient, light bevelled frame */
+.win{background:linear-gradient(135deg, var(--win-hi) 0%, #1530a0 35%, var(--win-lo) 100%);
+  border:2px solid var(--frame);border-radius:7px;
+  box-shadow:inset 0 0 0 1px var(--frame-dark), inset 2px 2px 0 1px rgba(255,255,255,.12), 0 4px 14px rgba(0,0,0,.6);
+  padding:14px 18px;min-width:0}
+.full{grid-column:1 / -1}
+.side{display:flex;flex-direction:column;gap:10px;min-width:0}
+
+h1{font-size:clamp(26px,4.6vw,36px);font-weight:700;margin:0;letter-spacing:.01em;text-wrap:balance}
+.title-win{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 16px}
+.title-win p{margin:0;color:var(--grey);font-size:16px}
+
+/* Help bar = drop zone */
+.help{cursor:pointer;display:flex;flex-direction:column;gap:6px;outline:none}
+.help-line{display:flex;align-items:center;gap:10px}
+.glove{flex:none;width:36px;height:24px}
+.help:hover .glove,.help.over .glove{animation:poke .5s ease-in-out infinite alternate}
+@keyframes poke{to{transform:translateX(5px)}}
+.help.over{border-color:var(--yellow)}
+.help:focus-visible{border-color:var(--yellow)}
+.help small{color:var(--grey);font-size:15px;font-weight:500}
+.path{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:15px;font-weight:500;color:var(--grey)}
+.path code{font-family:Consolas, "Courier New", monospace;color:var(--text);background:rgba(0,0,20,.45);padding:1px 6px;border-radius:3px;word-break:break-all;text-shadow:none}
+button{font:inherit;font-size:15px;color:var(--text);text-shadow:inherit;cursor:pointer;
+  background:linear-gradient(135deg,var(--win-hi),var(--win-lo));border:1.5px solid var(--frame);border-radius:5px;padding:1px 10px}
+button:hover,button:focus-visible{border-color:var(--yellow);outline:none}
+button[aria-pressed="true"]{border-color:var(--yellow);color:var(--yellow)}
+
+.status{font-size:16px;color:var(--grey);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.status .tag{color:var(--label);text-transform:uppercase;letter-spacing:.08em;font-size:14px}
+.status .tag.live{color:var(--yellow)}
+.status .err{color:var(--lim-a)}
+
+/* Counter achievements, laid out like party rows */
+.party{display:flex;flex-direction:column;gap:6px}
+.member{display:grid;grid-template-columns:76px minmax(0,1fr);gap:4px 16px;padding:12px 4px 14px;border-bottom:1px solid rgba(212,214,228,.18)}
+.member:last-of-type{border-bottom:0}
+.crest{grid-row:span 3;width:76px;height:76px;border:2px solid var(--frame);border-radius:5px;display:grid;place-items:center;
+  background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.18), transparent 60%), var(--win-lo)}
+.crest{overflow:hidden;padding:0}
+.crest img{display:block;width:100%;height:100%;object-fit:cover}
+.name{font-size:24px;font-weight:700;line-height:1.1;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}
+.state{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--label)}
+.done .state{color:var(--yellow)}
+.desc{color:var(--grey);font-size:16px;font-weight:500}
+.stat{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;align-items:center}
+.stat .lbl{color:var(--label);font-size:15px;letter-spacing:.08em;text-transform:uppercase}
+.num{font-variant-numeric:tabular-nums;font-size:22px;display:flex;flex-wrap:wrap;gap:0 10px;align-items:baseline}
+.num .of{color:var(--grey);font-size:18px}
+.num .delta{color:var(--yellow);font-size:15px}
+.gauge{grid-column:1 / -1;height:10px;background:var(--gauge-bg);border:1px solid var(--frame-dark);border-radius:2px;overflow:hidden;max-width:360px}
+.gauge b{display:block;height:100%;width:0;transition:width .7s ease}
+.hp .gauge b{background:linear-gradient(to bottom, var(--hp-a), var(--hp-b))}
+.limit .gauge b{background:linear-gradient(to bottom, var(--lim-a), var(--lim-b))}
+.done .gauge b{animation:flash .9s steps(2) infinite}
+@keyframes flash{50%{filter:brightness(1.8) saturate(.6)}}
+.togo{grid-column:1 / -1;font-size:16px;color:var(--text)}
+.togo em{font-style:normal;color:var(--yellow)}
+.note{font-size:14px;font-weight:500;color:var(--grey);margin:4px 0 0}
+
+/* Command list (right column) */
+.cmds{display:flex;flex-direction:column;gap:2px;margin:0}
+.cmds div{display:flex;justify-content:space-between;gap:10px;padding:3px 2px}
+.cmds dd{margin:0;font-variant-numeric:tabular-nums}
+.win h2{margin:0 0 6px;font-size:15px;color:var(--label);letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+.timegil{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;font-variant-numeric:tabular-nums}
+.timegil span:nth-child(odd){color:var(--label)}
+.timegil span:nth-child(even){text-align:right}
+
+/* All achievements */
+.list-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px;margin-bottom:6px}
+.list-head h2{margin:0}
+.summary{font-size:16px;color:var(--grey);font-weight:500}
+.summary b{color:var(--text);font-weight:700}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.group{margin-top:14px}
+.group h3{margin:0 0 4px;font-size:14px;color:var(--grey);letter-spacing:.1em;text-transform:uppercase;font-weight:600;
+  border-bottom:1px solid rgba(212,214,228,.18);padding-bottom:4px}
+.rows{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:0 24px}
+.row{display:grid;grid-template-columns:56px minmax(0,1fr);gap:0 14px;padding:10px 2px;border-bottom:1px solid rgba(212,214,228,.08);align-items:start}
+.r-icon{width:56px;height:56px;display:block;border:1.5px solid var(--frame);border-radius:4px;background:var(--win-lo);
+  box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.row.unknown .r-icon{opacity:.55}
+.r-main{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:baseline;min-width:0}
+.row .r-name{font-size:18px}
+.row .r-state{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--label);text-align:right;white-space:nowrap}
+.row .r-desc{grid-column:1 / -1;font-size:15px;font-weight:500;color:var(--grey)}
+.row .r-val{grid-column:1 / -1;display:flex;align-items:center;gap:10px;font-size:15px;font-variant-numeric:tabular-nums}
+.row .r-val .gauge{flex:1;max-width:180px;height:7px}
+.row .r-val .gauge b{background:linear-gradient(to bottom, var(--hp-a), var(--hp-b))}
+.row.done .r-state{color:var(--yellow)}
+.row.done .r-val .gauge b{background:linear-gradient(to bottom, #fff7a8, #d9b52a)}
+.row.unknown .r-name{color:var(--grey)}
+.row.unknown .r-state{color:var(--dim)}
+.row.unknown .r-val{color:var(--dim);font-weight:500}
+.list.hide-done .row.done{display:none}
+
+footer{grid-column:1 / -1;font-size:14px;font-weight:500;color:var(--grey);max-width:72ch;padding:6px 4px;text-shadow:none}
+footer code{font-family:Consolas, "Courier New", monospace;color:var(--text)}
+@media (prefers-reduced-motion: reduce){ .gauge b{transition:none} .done .gauge b,.help:hover .glove,.help.over .glove{animation:none} }
+</style>
+</head>
+<body>
+
+<canvas id="stream" aria-hidden="true"></canvas>
+<div class="screen">
+  <div class="win full title-win">
+    <h1>Stagger &amp; Resonance Tally</h1>
+    <p>Final Fantasy Resonance save reader</p>
+  </div>
+
+  <div class="win full help" id="drop" tabindex="0" role="button" aria-label="Choose a save file">
+    <div class="help-line">
+      <svg class="glove" viewBox="0 0 40 26" aria-hidden="true">
+        <g fill="#fbfbff" stroke="#2b2f4a" stroke-width="1.3" stroke-linejoin="round">
+          <rect x="1.5" y="7" width="7" height="14" rx="2"/>
+          <path d="M8 8.5c0-1.6 1.2-2.8 2.8-2.8H19c2 0 3 1.2 3 2.8v10.8c0 1.8-1.4 3.2-3.2 3.2h-8c-1.6 0-2.8-1.2-2.8-2.8z"/>
+          <rect x="17" y="17.6" width="7.5" height="4.4" rx="2.2"/>
+          <rect x="17.5" y="13.4" width="8.5" height="4.6" rx="2.3"/>
+          <rect x="18" y="7.6" width="20.5" height="6.2" rx="3.1"/>
+          <path d="M11 6.2c0-2 1.4-3.6 3.4-3.6h4.8c1.6 0 2.6 1 2.6 2.4s-1 2.4-2.6 2.4H14"/>
+        </g>
+      </svg>
+      <span>Drop GameSaveData0.sav or GameSaveData1.sav here, or click to choose.</span>
+    </div>
+    <small>Each save file is one slot. Nothing is uploaded; the save is decrypted on this page.</small>
+    <div class="path">Saves are in <code id="savepath">%LOCALAPPDATA%\FFRS\Steam\</code><button type="button" id="copy">Copy path</button></div>
+    <input type="file" id="file" accept=".sav" hidden>
+  </div>
+
+  <div class="win full status" id="status"></div>
+
+  <div class="win party">
+    <h2>Counters</h2>
+    <article class="member limit" id="ach-stagger">
+      <div class="crest"><img alt="" src="icons/31fa2d3f5e57ffea213830a121b5d69d56c13bb9.jpg" width="76" height="76"></div>
+      <div class="name">Keep Them on Their Toes <span class="state"></span></div>
+      <div class="desc">Stagger enemies 1000 times.</div>
+      <div class="stat">
+        <span class="lbl">Stagger</span>
+        <span class="num"><span class="n">0</span><span class="of">/ 1000</span><span class="delta"></span></span>
+        <div class="gauge"><b></b></div>
+        <div class="togo"></div>
+      </div>
+    </article>
+    <article class="member hp" id="ach-reso">
+      <div class="crest"><img alt="" src="icons/fcff68165d0fecba17eef94e3523981d0cedf110.jpg" width="76" height="76"></div>
+      <div class="name">Resonance Rapid Fire <span class="state"></span></div>
+      <div class="desc">Use Resonances 400 times.</div>
+      <div class="stat">
+        <span class="lbl">Reso</span>
+        <span class="num"><span class="n">0</span><span class="of">/ 400</span><span class="delta"></span></span>
+        <div class="gauge"><b></b></div>
+        <div class="togo"></div>
+      </div>
+    </article>
+    <p class="note">Resonances are read from the save's finish-blow counter. It's the only other battle counter in the file, so it is most likely the right one.</p>
+  </div>
+
+  <div class="side">
+    <div class="win">
+      <h2>Record</h2>
+      <dl class="cmds" id="record"></dl>
+    </div>
+    <div class="win timegil" id="timegil"></div>
+  </div>
+
+  <div class="win full list" id="list">
+    <div class="list-head">
+      <h2>All achievements</h2>
+      <div class="filters"><button type="button" id="hide-done" aria-pressed="false">Hide complete</button></div>
+    </div>
+    <div class="summary" id="summary"></div>
+    <div id="groups"></div>
+  </div>
+
+  <footer>Everything here is read from the save file, not from Steam. "Complete" means the save meets the condition; Steam unlocks the achievement itself. Achievements marked "Not in save" depend on game data this page can't see, such as which enemies are cave masters. The yellow numbers show the change since the last save you loaded in this browser.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<script>
+const KEY = CryptoJS.enc.Utf8.parse("wwrqPkdwzPvgfchQ8kTYHVbn4umTf3d7");
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n).toLocaleString("en-US");
+
+class SaveError extends Error {}
+function decrypt(u8){
+  if (u8.length < 48 || String.fromCharCode(u8[0],u8[1],u8[2],u8[3]) !== "SVHD") throw new SaveError("This isn't a Final Fantasy Resonance save. Pick GameSaveData0.sav or GameSaveData1.sav.");
+  const body = u8.slice(32, 32 + Math.floor((u8.length - 32) / 16) * 16);
+  const pt = CryptoJS.AES.decrypt(CryptoJS.lib.CipherParams.create({ciphertext: CryptoJS.lib.WordArray.create(body)}), KEY,
+    {mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.NoPadding});
+  const out = new Uint8Array(pt.sigBytes), w = pt.words;
+  for (let i = 0; i < out.length; i++) out[i] = (w[i >>> 2] >>> (24 - (i & 3) * 8)) & 0xff;
+  if (String.fromCharCode(out[0],out[1],out[2],out[3]) !== "GVAS") throw new SaveError("The file couldn't be decrypted. OptionSaveData.sav holds settings only; use a GameSaveData file.");
+  return out;
+}
+
+const latin1 = new TextDecoder("latin1"), utf16 = new TextDecoder("utf-16le");
+class Reader {
+  constructor(b){ this.b = b; this.d = new DataView(b.buffer, b.byteOffset, b.byteLength); this.o = 0; }
+  i32(){ const v = this.d.getInt32(this.o, true); this.o += 4; return v; }
+  u32(){ const v = this.d.getUint32(this.o, true); this.o += 4; return v; }
+  u16(){ const v = this.d.getUint16(this.o, true); this.o += 2; return v; }
+  i16(){ const v = this.d.getInt16(this.o, true); this.o += 2; return v; }
+  u8(){ return this.b[this.o++]; }
+  i8(){ const v = this.d.getInt8(this.o); this.o += 1; return v; }
+  f32(){ const v = this.d.getFloat32(this.o, true); this.o += 4; return v; }
+  f64(){ const v = this.d.getFloat64(this.o, true); this.o += 8; return v; }
+  i64(){ return this.d.getBigInt64((this.o += 8) - 8, true); }
+  u64(){ return Number(this.d.getBigUint64((this.o += 8) - 8, true)); }
+  fstr(){
+    const n = this.i32();
+    if (n === 0) return "";
+    if (n < 0) { const len = -n * 2; const s = utf16.decode(this.b.subarray(this.o, this.o + len - 2)); this.o += len; return s; }
+    if (n > this.b.length - this.o) throw new SaveError("parse");
+    const s = latin1.decode(this.b.subarray(this.o, this.o + n - 1)); this.o += n; return s;
+  }
+  typename(){ const a = [this.fstr()]; const n = this.i32(); for (let i = 0; i < n; i++) a.push(this.typename()); return a; }
+}
+const SCALAR = {IntProperty:"i32",UInt32Property:"u32",Int64Property:"i64",UInt64Property:"u64",Int16Property:"i16",
+  UInt16Property:"u16",Int8Property:"i8",FloatProperty:"f32",DoubleProperty:"f64"};
+const NATIVE = {DateTime:8,Timespan:8,Vector:24,Rotator:24,Vector2D:16,Quat:32,LinearColor:16,Color:4,IntPoint:8,IntVector:12,Guid:16};
+
+function readProps(r){
+  const out = {};
+  for (;;) {
+    const name = r.fstr();
+    if (name === "None" || name === "") return out;
+    const ty = r.typename(), size = r.i32(), flags = r.u8();
+    if (flags & 1) r.i32();
+    if (flags & 2) r.o += 16;
+    if (flags & 4) { if (r.u8() & 2) r.o += 17; }
+    const start = r.o;
+    if (ty[0] === "BoolProperty") out[name] = !!(flags & 0x10);
+    else { try { out[name] = readValue(r, ty); } catch(e) { out[name] = null; } }
+    r.o = start + size;
+  }
+}
+function readValue(r, ty){
+  const k = ty[0];
+  if (SCALAR[k]) return r[SCALAR[k]]();
+  switch (k) {
+    case "BoolProperty": return !!r.u8();
+    case "StrProperty": case "NameProperty": case "EnumProperty": case "SoftObjectProperty": case "ObjectProperty": return r.fstr();
+    case "ByteProperty": return ty.length > 1 ? r.fstr() : r.u8();
+    case "StructProperty": {
+      const s = ty[1][0];
+      if (s === "DateTime") return r.i64();
+      if (NATIVE[s]) { r.o += NATIVE[s]; return null; }
+      return readProps(r);
+    }
+    case "ArrayProperty": case "SetProperty": {
+      if (k === "SetProperty") r.i32();
+      const n = r.i32();
+      if (ty[1].length === 1 && ty[1][0] === "ByteProperty") { r.o += n; return null; }
+      const a = new Array(n); for (let i = 0; i < n; i++) a[i] = readValue(r, ty[1]); return a;
+    }
+    case "MapProperty": {
+      r.i32(); const n = r.i32(), a = [];
+      for (let i = 0; i < n; i++) { const key = readValue(r, ty[1]); a.push([key, readValue(r, ty[2])]); }
+      return a;
+    }
+  }
+  throw new SaveError("parse");
+}
+
+// Pull out only the numbers the page shows, so the rest of the save can be dropped
+function summarize(u8){
+  const r = new Reader(decrypt(u8));
+  r.o = 4; r.i32(); r.i32(); r.i32(); r.u16(); r.u16(); r.u16(); r.u32(); r.fstr();
+  r.i32(); const nc = r.i32(); r.o += nc * 20;
+  r.fstr(); r.u8();
+  const s = readProps(r), p = s.Player;
+  if (!p || typeof p.breakCount !== "number") throw new SaveError("The save opened, but its player stats weren't where expected. A game update may have changed the format.");
+  const rb = (s.colosseumProgress && s.colosseumProgress.RankBattle) || [];
+  // Colosseum keys are Japanese: 初級 Fledgling, 中級 Brawler, 上級 Gladiator (最上級 is the league above, no achievement)
+  const league = tier => {
+    const fights = rb.filter(([k]) => String(k).startsWith(tier + "_"));
+    return [fights.filter(([, v]) => v && String(v.Status).endsWith("::Clear")).length, fights.length || 5];
+  };
+  const units = s.unitParameterList || [], visions = s.visionList || [];
+  return {
+    player: p,
+    story: s.Progress && s.Progress.Progress ? s.Progress.Progress[0] : null,
+    joined: [units.filter(u => String(u.JoinStatus).endsWith("::Join")).length, units.length || 8],
+    airship: s.Map ? !!s.Map.IsAlreadySpawnAirship : null,
+    colo: {fledgling: league("初級"), brawler: league("中級"), gladiator: league("上級")},
+    visions: visions.length,
+    maxAwake: visions.reduce((m, v) => Math.max(m, v.awakeningPoint || 0), 0),
+  };
+}
+
+// Example save, shown until a file is loaded
+const SAMPLE = {
+  player: {currentMoney:1834561,SavedDateTime:639287520341790000,PlayTime:233338,EscapeNum:248,WinNum:641,StealSuccessNum:3,
+    GameDifficulty:"eGameDifficulty::Easy",spentMoney:1683950,earnedMoney:3518511,breakCount:959,finishblowCount:214},
+  story: 8040, joined: [8, 8], airship: true,
+  colo: {fledgling: [5, 5], brawler: [5, 5], gladiator: [5, 5]}, visions: 26, maxAwake: 3,
+};
+
+// Every achievement. `read` returns [current, goal] or a boolean; leave it out when the save can't tell.
+// Steam achievement icons by name: [color, grey], served from icons/<hash>.jpg
+const ICONS = {"Ultimate Fantasy":["af5ecd7224d09b5e7972f18801062ced91325507","d684b97ec025b7cfa8622d9e91eec16b1c494cf3"],"A Journey Begins":["8dfdc353f058a10e279f1addc58ed121fcf1b5c1","ff8c5cb432fc6f21da425c3a5162ecd7539baf97"],"Those Who Unite the Skies":["062b1e6a11577f5ecfcd5479fbcd209ac1fab2dd","aec7741d9420001b3486f6321ffdad7cbba787ab"],"Olderion Blues":["a84a1196f1a8520cca484cbe610f7e68250122c7","2b3c8426029cc132bd298be93dd5f15212663bc8"],"Viva la Revolución":["89d47f5fb6ac5fb25d603e201ef0c2c0fce513b3","a324469914725941c5aac12e19aa642c005b2bbb"],"In Search of the Truth":["1e906146b64099a0f1d3a64b0542ea4798603838","deebb7751a82d5c46162a6cc7cc53d16257c1efb"],"And the Winner Is...":["d3dcde04e9e3734698b1b60ecfea4ab20b983692","cd127a7b9ce8c92789514b57c59823f7133de0a3"],"Past Glory":["cd5b9230c038e65fbb1edfb2145b9038b9ba44fc","bd6bc28e2010448d775843408913c4386dd3fee0"],"Aspiration’s End":["67f1a3237a62bc30057b2bda5a1e74e4e397a442","1bbcf54487c3f44feb987cd8483d5061f75785af"],"Those Who Defy Fate":["32345b85cac1f414eb492787215ef433bd45d461","dd4ad7afd4ac14ced76cfbb081de96568fa4c583"],"Conscience Renewed":["bb9adf5df34be30c142406bf40835efc90cc0596","9a668253e9d42d7e2a54ef0eaa2578f791398771"],"Kweh!":["ccd1ff2b78f364f44b1b8b7e9bc691f5c7634d41","c0e60a4cf905fb3296d222204182b61493dbe975"],"Airship Enterprise":["209d1d752266388a52fd717c5319c632987a4236","58393e4f4eacf961f3717002a3e01ac195d65069"],"Just Getting Started":["b0f6f759d728dce25a288fe69902895e637563c1","361972aa145f9de510c399fddb33890df57d4c7f"],"Arena Fighter":["0a8d7ca4d3a9e1b0da88e8408545692aefbf2476","62c453966caa14c7ffa563d1dc2064e51bdc13b4"],"Career Fighter":["3f277c0b72bbf2dd0ea3dddc59dc1bc0efb2b6fd","04a54a078a4d907f514e53e7365618d083b63fba"],"Princess’s Reward":["b49845c8716a94afe8cbcdef1d20edeccdff8e93","00760fdc247d5956bfb389ae605789ec3964ff37"],"Memento":["bd822c93b6f7d8b2c4cd22622c62a51666f5b36b","114e847244ae6e8c480a2449ce0a69d0b4186208"],"Gil Comes and Goes":["921d942d4febf4ed98f25bcfcf3335a7f0dea3d4","24f60e18166e65211992dfc571abf79805b1a012"],"Making Lid Proud":["bca7a9753c1cc63116209c674f1309be9881673a","f2f2e175e613711ac9101576ee7d5c64db8e7589"],"Magicite Hunter":["9190d041ba3345292f650eb3161b943671815c25","3bbb0d356b11424e00cf0c30eeae2ff13ac30eb2"],"The Bigger They Are...":["6d79958fcb42b236c9c9edf816269fe67661467b","77e7f6e1ac16cd4aafc6bbed0352d4447c049390"],"The Harder They Fall":["bae05e2158b7c60baca86b796db7d351f42b79fb","6cda559c2d9c49a1bad77d2cac5d684d191d8c1d"],"Struck Gold":["02dfb1f732f4590ba4364c2e0f5ee8332565b727","b4c049abf68fffc74e9f1ea115635ae36f740c44"],"The Weapon that Suits the User":["ca3e7ec5fe6676a64e9b1ccc05d0766b3d951fb0","c5db6c3502643bfe3f74a28c7bef733433fed972"],"The Weaponsmith":["68a3f4d907638c1989e87232352756bd6a147997","2fb5a31d649c3a6355a434378142ce4faabe3cc5"],"Ancient Artifact":["2ae629f9bd6dabd442c6fb0b0439a7cd8bcdef49","16a0fbb755b323091e553efe336b4f26bcbcf8d0"],"Legendary Arms":["2a29439baa8035a35d91ded9c40d1e6f64721a71","94271aa923c78a9bea88318d84163865d94e86c4"],"Priceless Experience":["ad8e0ca49857c53cef432c6e4913ac2c627707e3","9f8aa58026956f788cbc76c61cde620c25044b04"],"The First Step Towards Mastery":["25138cf611e139661902202cb969bfc2b7b6d771","f6924db39d893d50972efe9f9fa9b88653cfa750"],"Awakened Light":["0e1d729448b4ab66aaa8fdcc69d74c7e73e54a7e","3f85dca6ea9a2bef940ebe5da811d873f4ff2948"],"Visions Assemble":["dad08626b715772896cbe2fe37c814b366a2ef3a","91cdd324396941ce2042b15739f219f0c568ce8d"],"Will Crystallized":["da98979cdf4e8aaefb39c8663261675cd9233592","75976ea7cf603b51ff10fc03aad1f6bd0bbe74c7"],"Vision Connoisseur":["e8b8eaebf004927838d2469214f309eb471699eb","e5683997d26c6297dca41044f7709c2ef4201510"],"Esper’s Covenant":["74fa8f26b9fe5c053c72db22a93d47f61e323c3e","da7de9150322110662b1025b9f661b65f981acae"],"The Sovereigns of the Planet":["2ba72a4d99ec33ec74c285be2b379e90b86e2e8a","51dc4fec9eeff6b42ec4c99a14fb3b84aa6066f0"],"Keep Them on Their Toes":["31fa2d3f5e57ffea213830a121b5d69d56c13bb9","5b414a574a566159f8d189e853ae77ed10741951"],"Resonance Rapid Fire":["fcff68165d0fecba17eef94e3523981d0cedf110","9e0ef99791ae1b7b1a2329bc00d7017eb2ea065b"],"Mechabo Mania":["090f84b945292400556bcd8a59567032ef8449fc","961d99ecfe30f1df988baf3fe984ea7cdc7b89b7"],"My Name Is Ultima...":["d329d545941f009a4878b9e2fe28fd7e66e1a12b","886eb1a4d3752cfcb8c960df3c7d5a7be1a59ce8"]};
+const TOTAL_VISIONS = 26, MAX_AWAKEN = 3;
+const chapter = n => m => m.story == null ? null : m.story >= (n + 1) * 1000 ? true
+  : Math.floor(m.story / 1000) === n ? "In progress" : false;
+const ACH = [
+  ["Story", [
+    ["A Journey Begins", "Clear chapter 1.", chapter(1)],
+    ["Those Who Unite the Skies", "Clear chapter 2.", chapter(2)],
+    ["Olderion Blues", "Clear chapter 3.", chapter(3)],
+    ["Viva la Revolución", "Clear chapter 4.", chapter(4)],
+    ["In Search of the Truth", "Clear chapter 5.", chapter(5)],
+    ["And the Winner Is...", "Clear chapter 6.", chapter(6)],
+    ["Past Glory", "Clear chapter 7.", chapter(7)],
+    ["Aspiration’s End", "Clear chapter 8.", chapter(8)],
+    ["My Name Is Ultima...", "Defeat Ultima Weapon."],
+    ["Ultimate Fantasy", "Obtain all achievements."],
+  ]],
+  ["Party", [
+    ["Those Who Defy Fate", "Unlock all party members.", m => m.joined],
+    ["Conscience Renewed", "Clear all party member substories."],
+    ["Kweh!", "Obtain a chocobo."],
+    ["Airship Enterprise", "Obtain an airship.", m => m.airship],
+    ["Mechabo Mania", "Upgrade Mechabo to his ultimate form."],
+  ]],
+  ["Battle", [
+    ["Keep Them on Their Toes", "Stagger enemies 1000 times.", m => [m.player.breakCount, 1000]],
+    ["Resonance Rapid Fire", "Use Resonances 400 times.", m => [m.player.finishblowCount, 400]],
+    ["Just Getting Started", "Clear all Fledgling League fights in the Colosseum.", m => m.colo.fledgling],
+    ["Arena Fighter", "Clear all Brawler League fights in the Colosseum.", m => m.colo.brawler],
+    ["Career Fighter", "Clear all Gladiator League fights in the Colosseum.", m => m.colo.gladiator],
+    ["Magicite Hunter", "Defeat a cave master."],
+    ["The Bigger They Are...", "Defeat 5 cave masters."],
+    ["The Harder They Fall", "Defeat all cave masters."],
+    ["Struck Gold", "Defeat a King Gil Snapper for the first time."],
+    ["Priceless Experience", "Defeat a Metal Gigantuar for the first time."],
+  ]],
+  ["Visions & Espers", [
+    ["Visions Assemble", "Obtain 10 visions.", m => [m.visions, 10]],
+    ["Will Crystallized", "Obtain all visions.", m => [m.visions, TOTAL_VISIONS]],
+    ["Awakened Light", "Awaken a vision to its limit for the first time.", m => [m.maxAwake, MAX_AWAKEN]],
+    ["The First Step Towards Mastery", "Reach max Mastery Rank for a vision for the first time."],
+    ["Vision Connoisseur", "Reach max MR with 8 visions."],
+    ["Esper’s Covenant", "Gain help from 3 espers."],
+    ["The Sovereigns of the Planet", "Gain help from all espers."],
+  ]],
+  ["Gil & Gear", [
+    ["Gil Comes and Goes", "Spend a total of 100,000 gil.", m => [m.player.spentMoney || 0, 100000]],
+    ["Making Lid Proud", "Gain a total of 1,000,000 gil.", m => [m.player.earnedMoney || 0, 1000000]],
+    ["The Weapon that Suits the User", "Have Aileen craft a weapon for the first time."],
+    ["The Weaponsmith", "Have Aileen craft weapons for all party members."],
+    ["Ancient Artifact", "Obtain one of the Twelve Legendary Arms for the first time."],
+    ["Legendary Arms", "Obtain all Twelve Legendary Arms."],
+  ]],
+  ["Oblivion Palace", [
+    ["Princess’s Reward", "Receive a reward at Oblivion Palace for the first time."],
+    ["Memento", "Help the enigmatic princess regain her second memory."],
+  ]],
+];
+
+// Save time is stored as .NET-style ticks of the player's local clock
+function savedAt(ticks){
+  if (ticks == null) return "";
+  const ms = Number((BigInt(ticks) - 621355968000000000n) / 10000n);
+  return new Date(ms).toLocaleString("en-US", {timeZone:"UTC", month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit"});
+}
+const clock = s => `${Math.floor(s / 3600)}:${String(Math.floor(s % 3600 / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+const esc = s => String(s).replace(/[<>&"]/g, c => ({"<":"&lt;", ">":"&gt;", "&":"&amp;", '"':"&quot;"})[c]);
+
+const store = {
+  get(k){ try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+
+function tracker(id, value, goal, prev){
+  const el = $(id), done = value >= goal;
+  el.classList.toggle("done", done);
+  el.querySelector(".state").textContent = done ? "Complete" : `${Math.floor(Math.min(value / goal, 1) * 100)}%`;
+  el.querySelector(".n").textContent = value;
+  el.querySelector(".gauge b").style.width = Math.min(100, value / goal * 100) + "%";
+  el.querySelector(".togo").innerHTML = done ? "Gauge full. The achievement should pop next time the game checks." : `<em>${fmt(goal - value)}</em> to go`;
+  const d = prev == null ? 0 : value - prev;
+  el.querySelector(".delta").textContent = d > 0 ? `+${fmt(d)} since last load` : "";
+}
+
+function row(name, desc, read, m){
+  let v = null;
+  try { v = read ? read(m) : null; } catch { v = null; }
+  let cls = "unknown", state = "Not in save", val = "The save doesn't record this";
+  if (Array.isArray(v)) {
+    const [cur, goal] = v, done = cur >= goal;
+    cls = done ? "done" : "";
+    state = done ? "Complete" : `${Math.floor(cur / goal * 100)}%`;
+    val = `<span>${fmt(cur)} / ${fmt(goal)}</span><span class="gauge"><b style="width:${Math.min(100, cur / goal * 100)}%"></b></span>`;
+  } else if (v === true) { cls = "done"; state = "Complete"; val = "Done in this save"; }
+  else if (v === false) { cls = ""; state = "Not yet"; val = "Not done yet"; }
+  else if (typeof v === "string") { cls = ""; state = v; val = "You're on this chapter now"; }
+  const ic = ICONS[name], src = ic ? `icons/${ic[cls === "done" ? 0 : 1]}.jpg` : "";
+  const img = src ? `<img class="r-icon" src="${src}" alt="" width="56" height="56" loading="lazy">` : `<span class="r-icon"></span>`;
+  return {cls, html: `<div class="row ${cls}">${img}<div class="r-main"><span class="r-name">${esc(name)}</span><span class="r-state">${state}</span><span class="r-desc">${esc(desc)}</span><span class="r-val">${val}</span></div></div>`};
+}
+
+function render(m, label, prev){
+  const p = m.player;
+  tracker("ach-stagger", p.breakCount, 1000, prev && prev.breakCount);
+  tracker("ach-reso", p.finishblowCount, 400, prev && prev.finishblowCount);
+  const rows = [
+    ["Won", fmt(p.WinNum ?? 0)],
+    ["Escaped", fmt(p.EscapeNum ?? 0)],
+    ["Stolen", fmt(p.StealSuccessNum ?? 0)],
+    ["Difficulty", String(p.GameDifficulty || "").split("::").pop() || "?"],
+  ];
+  $("record").innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("");
+  $("timegil").innerHTML = `<span>Time</span><span>${clock(p.PlayTime ?? 0)}</span><span>Gil</span><span>${p.currentMoney ?? 0}</span>`;
+
+  let tracked = 0, complete = 0, total = 0;
+  $("groups").innerHTML = ACH.map(([group, list]) => {
+    const html = list.map(([name, desc, read]) => {
+      const r = row(name, desc, read, m);
+      total++; if (r.cls !== "unknown") tracked++; if (r.cls === "done") complete++;
+      return r.html;
+    }).join("");
+    return `<section class="group"><h3>${group}</h3><div class="rows">${html}</div></section>`;
+  }).join("");
+  $("summary").innerHTML = `<b>${complete}</b> of the <b>${tracked}</b> achievements this page can read are complete in this save. ${total - tracked} more aren't recorded in the save.`;
+  $("status").innerHTML = label;
+}
+
+async function load(file){
+  try {
+    const m = summarize(new Uint8Array(await file.arrayBuffer()));
+    const prev = store.get("ffr-tally-last");
+    render(m, `<span class="tag live">Loaded</span><span>${esc(file.name)} · saved ${savedAt(m.player.SavedDateTime)}</span>`, prev);
+    store.set("ffr-tally-last", {breakCount: m.player.breakCount, finishblowCount: m.player.finishblowCount});
+  } catch (e) {
+    const msg = e instanceof SaveError && e.message !== "parse" ? e.message : "The file couldn't be read. Make sure it's a GameSaveData file from Final Fantasy Resonance.";
+    $("status").innerHTML = `<span class="tag">Error</span><span class="err">${msg}</span>`;
+  }
+}
+
+const drop = $("drop"), input = $("file");
+drop.addEventListener("click", e => { if (e.target.id !== "copy") input.click(); });
+drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } });
+input.addEventListener("change", () => { if (input.files[0]) load(input.files[0]); input.value = ""; });
+["dragenter","dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) load(f); });
+document.addEventListener("dragover", e => e.preventDefault());
+document.addEventListener("drop", e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) load(f); });
+
+$("copy").addEventListener("click", e => {
+  e.stopPropagation();
+  const text = $("savepath").textContent, btn = e.currentTarget;
+  navigator.clipboard.writeText(text).then(() => { btn.textContent = "Copied"; setTimeout(() => btn.textContent = "Copy path", 1500); })
+    .catch(() => { const r = document.createRange(); r.selectNodeContents($("savepath")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); });
+});
+
+const hideBtn = $("hide-done");
+function setHide(on){ hideBtn.setAttribute("aria-pressed", on); $("list").classList.toggle("hide-done", on); store.set("ffr-tally-hide", on); }
+hideBtn.addEventListener("click", () => setHide(hideBtn.getAttribute("aria-pressed") !== "true"));
+setHide(store.get("ffr-tally-hide") === true);
+
+// Lifestream: slow green motes drifting upward behind the windows
+(function stream(){
+  const cv = $("stream"), ctx = cv.getContext("2d");
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let w, h, motes = [];
+  function size(){
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    w = innerWidth; h = innerHeight; cv.width = w * dpr; cv.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    motes = Array.from({length: Math.round(w * h / 9000)}, () => ({
+      x: Math.random() * w, y: Math.random() * h, r: .6 + Math.random() * 2.2,
+      v: .12 + Math.random() * .4, a: .15 + Math.random() * .5, p: Math.random() * 6.28
+    }));
+  }
+  function draw(t){
+    ctx.clearRect(0, 0, w, h);
+    for (const m of motes) {
+      if (!still) { m.y -= m.v; m.x += Math.sin(t / 2400 + m.p) * .25; if (m.y < -6) { m.y = h + 6; m.x = Math.random() * w; } }
+      const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r * 4);
+      g.addColorStop(0, `rgba(120,255,200,${m.a})`); g.addColorStop(1, "rgba(27,214,160,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(m.x, m.y, m.r * 4, 0, 6.2832); ctx.fill();
+    }
+    if (!still) requestAnimationFrame(draw);
+  }
+  size(); addEventListener("resize", size); requestAnimationFrame(draw);
+})();
+
+render(SAMPLE, `<span class="tag">Example</span><span>Example numbers. Drop your save to see your own.</span>`, null);
+</script>
+</body>
+</html>
