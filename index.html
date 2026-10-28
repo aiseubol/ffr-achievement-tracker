@@ -414,7 +414,7 @@ function tracker(id, value, goal, prev){
   el.querySelector(".state").textContent = done ? "Complete" : `${Math.floor(Math.min(value / goal, 1) * 100)}%`;
   el.querySelector(".n").textContent = value;
   el.querySelector(".gauge b").style.width = Math.min(100, value / goal * 100) + "%";
-  el.querySelector(".togo").innerHTML = done ? "Gauge full. The achievement should pop next time the game checks." : `<em>${fmt(goal - value)}</em> to go`;
+  el.querySelector(".togo").innerHTML = done ? "Goal reached!" : `<em>${fmt(goal - value)}</em> to go`;
   const d = prev == null ? 0 : value - prev;
   el.querySelector(".delta").textContent = d > 0 ? `+${fmt(d)} since last load` : "";
 }
